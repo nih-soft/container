@@ -24,7 +24,7 @@ final class Container implements ContainerInterface
             $config->alias(ContainerInterface::class, __CLASS__);
         }
 
-        $this->instantiator = new Instantiator($this, $config->cacheReflections, $config->mode);
+        $this->instantiator = new Instantiator($this, $config->cacheReflections, $config->mode, $config->maxDepth);
         $config->value(Instantiator::class, $this->instantiator);
         $this->instances[Instantiator::class] = $this->instantiator;
     }

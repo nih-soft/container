@@ -27,7 +27,8 @@ final class ContainerConfig
     public function __construct(
         public readonly bool $shared = false,
         public readonly Mode $mode = Mode::Default,
-        public readonly bool $cacheReflections = false,
+        public readonly bool $cacheReflections = true,
+        public readonly int  $maxDepth = 5,
     )
     {
         /** @noinspection UnusedConstructorDependenciesInspection */
@@ -46,10 +47,25 @@ final class ContainerConfig
     /**
      * @param class-string $id
      * */
-    public function bind(string $id): DefinitionBuilder
+    public function auto(string $id): DefinitionBuilder
     {
         $this->definitions[$id] ??= new Definition(
             id: $id,
+            auto: true,
+            shared: $this->shared,
+            mode: Mode::Default,
+        );
+        return ($this->definitionAttach)($this->definitions[$id]);
+    }
+
+    /**
+     * @param class-string $id
+     * */
+    public function manual(string $id): DefinitionBuilder
+    {
+        $this->definitions[$id] ??= new Definition(
+            id: $id,
+            auto: false,
             shared: $this->shared,
             mode: Mode::Default,
         );

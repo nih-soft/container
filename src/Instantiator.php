@@ -44,12 +44,16 @@ class Instantiator
 
     private int $depth = 0;
 
+    private readonly int $maxDepth;
+
     public function __construct(
         private readonly Container $container,
         private readonly ?bool     $cacheReflections = false,
         private Mode               $mode = Mode::Default,
+        int $maxDepth = 5,
     )
     {
+        $this->maxDepth = min(50, max(1, $maxDepth));
     }
 
     /**
@@ -199,7 +203,7 @@ class Instantiator
      *
      * @throws ReflectionException
      */
-    private function getClassReflection(string $class): ReflectionClass
+    public function getClassReflection(string $class): ReflectionClass
     {
         if ($this->cacheReflections) {
             return $this->reflectionsCache[$class] ??= new ReflectionClass($class);
@@ -208,13 +212,19 @@ class Instantiator
         return new ReflectionClass($class);
     }
 
-    public function getActualMode(Mode $mode, int $depth): Mode
+    private function getActualMode(Mode $mode, int $depth): Mode
     {
         $mode = match ($mode) {
             Mode::NestedGhost => ($depth > 0) ? Mode::Ghost : Mode::Default,
             Mode::NestedProxy => ($depth > 0) ? Mode::Proxy : Mode::Default,
             default => $mode,
         };
-        return ($mode === Mode::Default) ? $this->mode : $mode;
+        if ($mode === Mode::Default) {
+            $mode = $this->mode;
+        }
+        if ($mode === Mode::Instance && $depth > $this->maxDepth) {
+           $mode = Mode::Ghost;
+        }
+        return $mode;
     }
 }

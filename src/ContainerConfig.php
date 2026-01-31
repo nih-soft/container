@@ -12,6 +12,7 @@ final class ContainerConfig
 
     private readonly array $groupCallbacks;
 
+    /** @var Definition[]  */
     private array $definitions = [];
 
     private array $aliases = [];
@@ -86,6 +87,59 @@ final class ContainerConfig
         $this->values[$id] = $value;
     }
 
+
+    /**
+     * @param array<string, mixed> $pairs
+     */
+    public function add(array $pairs): void
+    {
+        foreach ($pairs as $id => $value) {
+            if ($id && is_string($id)) {
+                if (is_string($value) || $value instanceof Closure) {
+                    $this->definitions[$id] ??= new Definition(
+                        id: $id,
+                        auto: true,
+                        shared: $this->shared,
+                        mode: Mode::Default,
+                        to: $value,
+                    );
+                }
+                elseif ($value instanceof Definition) {
+                    $this->definitions[$id] ??= $value;
+                }
+                else {
+                    $this->values[$id] ??= $value;
+                }
+            }
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $pairs
+     */
+    public function replace(array $pairs): void
+    {
+        foreach ($pairs as $id => $value) {
+            if ($id && is_string($id)) {
+                if (is_string($value) || $value instanceof Closure) {
+                    $this->definitions[$id] = new Definition(
+                        id: $id,
+                        auto: true,
+                        shared: $this->shared,
+                        mode: Mode::Default,
+                        to: $value,
+                    );
+                }
+                elseif ($value instanceof Definition) {
+                    $this->definitions[$id] = $value;
+                }
+                else {
+                    $this->values[$id] = $value;
+                }
+            }
+        }
+    }
+
     /**
      * @param class-string $className
      * */
@@ -113,6 +167,13 @@ final class ContainerConfig
         return ($this->definitionAttach)($this->groups[$groupName][$group]);
     }
 
+    public function getValue(string $id): mixed
+    {
+        if (isset($this->aliases[$id])) {
+            $id = $this->aliases[$id];
+        }
+        return $this->values[$id] ?? null;
+    }
 
     /**
      * @param class-string $id
@@ -121,16 +182,6 @@ final class ContainerConfig
     {
         if (isset($this->aliases[$id])) {
             $id = $this->aliases[$id];
-        }
-        if (isset($this->values[$id])) {
-            //values have higher priority
-            $value = $this->values[$id];
-            $this->definitions[$id] = new Definition(
-                id: $id,
-                shared: true,
-                to: static fn() => $value,
-            );
-            unset($this->values[$id]);
         }
         if (isset($this->definitions[$id])) {
             return $this->definitions[$id];

@@ -18,15 +18,15 @@ final class Container implements ContainerInterface
     )
     {
         $config->value(__CLASS__, $this);
-        $this->instances[__CLASS__] = $this;
 
         if (!$this->has(ContainerInterface::class)) {
             $config->alias(ContainerInterface::class, __CLASS__);
         }
 
-        $this->instantiator = new Instantiator($this, $config->cacheReflections, $config->mode, $config->maxDepth);
-        $config->value(Instantiator::class, $this->instantiator);
-        $this->instances[Instantiator::class] = $this->instantiator;
+        $config->value(
+            Instantiator::class,
+            $this->instantiator = new Instantiator($this, $config->cacheReflections, $config->mode, $config->maxDepth)
+        );
     }
 
     /**
@@ -39,6 +39,11 @@ final class Container implements ContainerInterface
      */
     public function get(string $id): mixed
     {
+        $value = $this->config->getValue($id);
+        if ($value !== null) {
+            return $value;
+        }
+
         $definition = $this->config->getDefinition($id);
 
         if ($definition === null) {
@@ -67,6 +72,12 @@ final class Container implements ContainerInterface
      */
     public function new(string $id): mixed
     {
+        $value = $this->config->getValue($id);
+        if ($value !== null && !is_object($value)) {
+            //can return only simple types
+            return $value;
+        }
+
         $definition = $this->config->getDefinition($id);
 
         if ($definition === null) {
@@ -118,7 +129,7 @@ final class Container implements ContainerInterface
      */
     public function has(string $id): bool
     {
-        return isset($this->instances[$id]) || $this->config->getDefinition($id);
+        return isset($this->instances[$id]) || $this->config->getValue($id) || $this->config->getDefinition($id);
     }
 
     /**

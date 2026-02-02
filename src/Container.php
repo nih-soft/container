@@ -47,7 +47,7 @@ final class Container implements ContainerInterface
         $definition = $this->config->getDefinition($id);
 
         if ($definition === null) {
-            throw new ContainerNotFoundException();
+            throw new ContainerNotFoundException(sprintf('No definition or class found or resolvable for "%s".', $id));
         }
 
         $id = $definition->id;
@@ -81,7 +81,7 @@ final class Container implements ContainerInterface
         $definition = $this->config->getDefinition($id);
 
         if ($definition === null) {
-            throw new ContainerNotFoundException();
+            throw new ContainerNotFoundException(sprintf('No definition or class found or resolvable for "%s".', $id));
         }
 
         return $this->newFromDefinition($definition);
@@ -129,7 +129,7 @@ final class Container implements ContainerInterface
      */
     public function has(string $id): bool
     {
-        return isset($this->instances[$id]) || $this->config->getValue($id) || $this->config->getDefinition($id);
+        return isset($this->instances[$id]) || $this->config->getValue($id) !== null || $this->config->getDefinition($id);
     }
 
     /**

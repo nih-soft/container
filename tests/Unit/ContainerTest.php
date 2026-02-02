@@ -70,15 +70,7 @@ final class ContainerTest
         Assert::instanceOf(stdClass::class, $actual);
         Assert::notSame($expect, $actual, 'get() and new() - different objects');
 
-        //$expect = $container->get(Instantiator::class);
-        //$actual = $container->new(Instantiator::class);
-        //Assert::instanceOf(Instantiator::class, $expect);
-        //Assert::instanceOf(Instantiator::class, $actual);
-        //Assert::notSame($expect, $actual, 'get() and new() - different objects (value definition)');
-
         Expect::exception(ContainerNotFoundException::class);
-            //->fromMethod(self::class, __METHOD__);
-            //->withMessageContaining('No definition or class found or resolvable for');
         $container->get('invalid_id');
     }
 

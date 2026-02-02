@@ -113,7 +113,11 @@ final class Container implements ContainerInterface
                 );
 
         } catch (Throwable $e) {
-            throw new ContainerException(message: "Error for key $definition->id. Invalid definition?", previous: $e);
+            throw new ContainerException(message: sprintf(
+                'Error while resolving %s. %s',
+                $definition->id,
+                $e->getMessage()
+            ), previous: $e);
         }
     }
 

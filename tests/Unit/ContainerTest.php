@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace NIH\Container\Tests\Unit;
 
 use NIH\Container\Container;
+use NIH\Container\ContainerException;
 use NIH\Container\ContainerConfig;
 use NIH\Container\ContainerNotFoundException;
 use NIH\Container\Instantiator;
@@ -117,5 +118,15 @@ final class ContainerTest extends TestCase
             $container->get(ContainerInterface::class),
             ContainerInterface::class . ' registered as value in nonshared container'
         );
+    }
+
+    public function testGetWrapsResolutionErrors(): void
+    {
+        $config = new ContainerConfig();
+        $config->manual('broken_entry')->to('Unknown\\MissingClass');
+        $container = new Container($config);
+
+        $this->expectException(ContainerException::class);
+        $container->get('broken_entry');
     }
 }

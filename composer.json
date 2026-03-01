@@ -34,7 +34,7 @@
         }
     },
     "scripts": {
-        "test": "phpunit --testdox"
+        "test": "phpunit --testdox --no-coverage"
     },
     "scripts-descriptions": {
         "test": "Run all tests"

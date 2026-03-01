@@ -220,7 +220,7 @@ class Instantiator
             default => $mode,
         };
         if ($mode === Mode::Default) {
-            $mode = $this->mode;
+            $mode = $this->mode !== Mode::Default ? $this->mode : Mode::Instance;
         }
         if ($mode === Mode::Instance && $depth > $this->maxDepth) {
            $mode = Mode::Ghost;

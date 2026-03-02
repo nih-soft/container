@@ -1,6 +1,7 @@
 {
     "name": "nih/container",
     "type": "library",
+    "license": "MIT",
     "description": "NIH container",
     "keywords": [
         "di",
@@ -16,7 +17,7 @@
         "source": "https://github.com/nih-soft/container"
     },
     "require": {
-        "php": "8.4 - 8.5",
+        "php": "^8.5",
         "psr/container": "^2.0",
         "yiisoft/injector": "^1.2.0"
     },

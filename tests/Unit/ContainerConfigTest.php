@@ -7,6 +7,8 @@ namespace NIH\Container\Tests\Unit;
 use NIH\Container\ContainerConfig;
 use NIH\Container\Definition;
 use NIH\Container\Mode;
+use NIH\Container\Tests\Fixtures\ModeDepthOne;
+use NIH\Container\Tests\Fixtures\ModeSimple;
 use NIH\Container\Tests\Fixtures\Some;
 use NIH\Container\Tests\Fixtures\SomeInterface;
 use PHPUnit\Framework\TestCase;
@@ -127,5 +129,56 @@ final class ContainerConfigTest extends TestCase
         self::assertTrue($known->shared);
         self::assertSame(Mode::Default, $known->mode);
         self::assertNull($unknown);
+    }
+
+    public function testInheritGroupDefinitionAppliesToImplementations(): void
+    {
+        $config = new ContainerConfig();
+        $config->inherit(SomeInterface::class)
+            ->manual()
+            ->shared()
+            ->mode(Mode::Proxy)
+            ->argument('source', 'inherit');
+
+        $definition = $config->getDefinition(Some::class);
+        self::assertNotNull($definition);
+        self::assertSame(Some::class, $definition->id);
+        self::assertFalse($definition->auto);
+        self::assertTrue($definition->shared);
+        self::assertSame(Mode::Proxy, $definition->mode);
+        self::assertSame(['source' => 'inherit'], $definition->args);
+    }
+
+    public function testNamespaceGroupDefinitionAppliesWithTrimmedPrefix(): void
+    {
+        $config = new ContainerConfig();
+        $config->namespace('NIH\\Container\\Tests\\Fixtures\\')
+            ->manual()
+            ->mode(Mode::Ghost)
+            ->argument('source', 'namespace');
+
+        $definition = $config->getDefinition(ModeSimple::class);
+        self::assertNotNull($definition);
+        self::assertSame(ModeSimple::class, $definition->id);
+        self::assertFalse($definition->auto);
+        self::assertSame(Mode::Ghost, $definition->mode);
+        self::assertSame(['source' => 'namespace'], $definition->args);
+    }
+
+    public function testRegexGroupDefinitionAppliesToMatchingClasses(): void
+    {
+        $config = new ContainerConfig();
+        $config->regex('/^NIH\\\\Container\\\\Tests\\\\Fixtures\\\\ModeDepth.+$/')
+            ->shared()
+            ->mode(Mode::NestedGhost)
+            ->argument('source', 'regex');
+
+        $definition = $config->getDefinition(ModeDepthOne::class);
+        self::assertNotNull($definition);
+        self::assertSame(ModeDepthOne::class, $definition->id);
+        self::assertFalse($definition->auto);
+        self::assertTrue($definition->shared);
+        self::assertSame(Mode::NestedGhost, $definition->mode);
+        self::assertSame(['source' => 'regex'], $definition->args);
     }
 }

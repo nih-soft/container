@@ -200,7 +200,7 @@ final class ContainerConfig
         foreach ($this->groupCallbacks as $groupName => $callback) {
             if (isset($this->groups[$groupName]) && is_array($this->groups[$groupName])) {
                 foreach ($this->groups[$groupName] as $group => $definition) {
-                    if ($callback($group, $id)) {
+                    if ($callback($id, $group)) {
                         return $this->cache[$id] = $this->fromGroupDefinition($id, $definition);
                     }
                 }
@@ -217,17 +217,22 @@ final class ContainerConfig
 
     private function fromGroupDefinition(string $id, Definition $definition): ?Definition
     {
+        $target = $definition->to;
+
         if ($definition->to && is_string($definition->to)) {
             if (!is_callable($definition->to)) {
                 return null;
             }
-            return clone($definition, [
-                'id' => $id,
-                'to' => ($definition->to)(...),
-            ]);
+            $target = ($definition->to)(...);
         }
-        return clone($definition, [
-            'id' => $id,
-        ]);
+
+        return new Definition(
+            id: $id,
+            auto: $definition->auto,
+            shared: $definition->shared,
+            mode: $definition->mode,
+            to: $target,
+            args: $definition->args,
+        );
     }
 }

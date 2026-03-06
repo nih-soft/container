@@ -39,24 +39,35 @@ final class Container implements ContainerInterface
      */
     public function get(string $id): mixed
     {
-        $value = $this->config->getValue($id);
-        if ($value !== null) {
-            return $value;
+        //fast path from cache (values and shared entries). Only for benchmark
+        if (isset($this->instances[$id])) {
+            return $this->instances[$id];
         }
 
-        $definition = $this->config->getDefinition($id);
+        $config = $this->config;
+        $id = $config->getRealId($id);
+
+        //fast path from cache (aliased values and shared entries)
+        if (isset($this->instances[$id])) {
+            return $this->instances[$id];
+        }
+
+        $value = $config->getValue($id);
+
+        if ($value !== null) {
+            //set cache and return value
+            return $this->instances[$id] = $value;
+        }
+
+        $definition = $config->getDefinition($id);
 
         if ($definition === null) {
             throw new ContainerNotFoundException(sprintf('No definition or class found or resolvable for "%s".', $id));
         }
 
-        $id = $definition->id;
-
-        if ($definition->shared && isset($this->instances[$id])) {
-            return $this->instances[$id];
-        }
         $instance = $this->newFromDefinition($definition);
         if ($definition->shared) {
+            //set cache
             $this->instances[$id] = $instance;
         }
         return $instance;
@@ -72,13 +83,16 @@ final class Container implements ContainerInterface
      */
     public function new(string $id): mixed
     {
-        $value = $this->config->getValue($id);
+        $config = $this->config;
+        $id = $config->getRealId($id);
+
+        $value = $config->getValue($id);
         if ($value !== null && !is_object($value)) {
             //can return only simple types
             return $value;
         }
 
-        $definition = $this->config->getDefinition($id);
+        $definition = $config->getDefinition($id);
 
         if ($definition === null) {
             throw new ContainerNotFoundException(sprintf('No definition or class found or resolvable for "%s".', $id));
@@ -133,7 +147,10 @@ final class Container implements ContainerInterface
      */
     public function has(string $id): bool
     {
-        return isset($this->instances[$id]) || $this->config->getValue($id) !== null || $this->config->getDefinition($id);
+        $config = $this->config;
+        $id = $config->getRealId($id);
+
+        return isset($this->instances[$id]) || $config->getValue($id) !== null || $config->getDefinition($id);
     }
 
     /**
@@ -145,7 +162,9 @@ final class Container implements ContainerInterface
      */
     public function hasInstance(string $id): bool
     {
-        $definition = $this->config->getDefinition($id);
+        $config = $this->config;
+        $id = $config->getRealId($id);
+        $definition = $config->getDefinition($id);
 
         return ($definition !== null) && isset($this->instances[$definition->id]) && $definition->shared;
     }

@@ -76,10 +76,10 @@ final class ContainerConfigTest extends TestCase
         $config->manual(SomeInterface::class)->to(Some::class);
         $config->alias('service_alias', SomeInterface::class);
 
-        self::assertSame(42, $config->getValue('answer_alias'));
+        self::assertSame(42, $config->getValue($config->getRealId('answer_alias')));
         self::assertSame(
             SomeInterface::class,
-            $config->getDefinition('service_alias')?->id
+            $config->getDefinition($config->getRealId('service_alias'))?->id
         );
     }
 

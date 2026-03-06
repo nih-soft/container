@@ -167,22 +167,18 @@ final class ContainerConfig
         return ($this->definitionAttach)($this->groups[$groupName][$group]);
     }
 
+    public function getRealId(string $id): string
+    {
+        return $this->aliases[$id] ?? $id;
+    }
+
     public function getValue(string $id): mixed
     {
-        if (isset($this->aliases[$id])) {
-            $id = $this->aliases[$id];
-        }
         return $this->values[$id] ?? null;
     }
 
-    /**
-     * @param class-string $id
-     * */
     public function getDefinition(string $id): ?Definition
     {
-        if (isset($this->aliases[$id])) {
-            $id = $this->aliases[$id];
-        }
         if (isset($this->definitions[$id])) {
             return $this->definitions[$id];
         }

@@ -176,12 +176,12 @@ For exact branching logic, see `ContainerConfig::add()` and `ContainerConfig::re
 
 Resolution priority note:
 
-| Input state for `$id` | `get($id)` | `new($id)` |
-|---|---|---|
-| scalar/array value exists | returns `value()` | returns `value()` |
-| object value exists + definition/class exists | returns `value()` object | ignores object `value()`, instantiates via definition/class |
-| object value exists + no definition/class | returns `value()` object | throws `ContainerNotFoundException` |
-| only definition/class exists | instantiates via definition/class | instantiates via definition/class |
+| Input state for `$id`                         | `get($id)`                        | `new($id)`                                                  |
+|-----------------------------------------------|-----------------------------------|-------------------------------------------------------------|
+| scalar/array value exists                     | returns `value()`                 | returns `value()`                                           |
+| object value exists + definition/class exists | returns `value()` object          | ignores object `value()`, instantiates via definition/class |
+| object value exists + no definition/class     | returns `value()` object          | throws `ContainerNotFoundException`                         |
+| only definition/class exists                  | instantiates via definition/class | instantiates via definition/class                           |
 
 ### Group Definitions: `inherit()`, `namespace()`, `regex()`
 

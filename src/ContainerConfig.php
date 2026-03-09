@@ -6,39 +6,22 @@ namespace NIH\Container;
 
 use Closure;
 
-final class ContainerConfig
+final class ContainerConfig extends ContainerData
 {
-    private array $groups = [];
-
-    private readonly array $groupCallbacks;
-
-    /** @var Definition[]  */
-    private array $definitions = [];
-
-    private array $aliases = [];
-
-    private array $values = [];
-
-    private array $cache = [];
-
     private readonly DefinitionBuilder $builder;
 
     private readonly Closure $definitionAttach;
 
     public function __construct(
-        public readonly bool $shared = false,
+        bool $shared = false,
         public readonly Mode $mode = Mode::Default,
         public readonly bool $cacheReflections = true,
         public readonly int  $maxDepth = 5,
     )
     {
+        $this->shared = $shared;
         /** @noinspection UnusedConstructorDependenciesInspection */
         $this->builder = new DefinitionBuilder();
-        $this->groupCallbacks = [
-            'inherit' => static fn(string $id, string $group) => is_a($id, $group, true),
-            'namespace' => static fn(string $id, string $group) => str_starts_with($id, $group . '\\'),
-            'regex' => static fn(string $id, string $group) => preg_match($group, $id),
-        ];
         $this->definitionAttach = (function (Definition $definition): DefinitionBuilder {
             $this->definition = $definition;
             return $this;
@@ -84,9 +67,8 @@ final class ContainerConfig
 
     public function value(string $id, mixed $value): void
     {
-        $this->values[$id] = $value;
+        $this->services[$id] = $value;
     }
-
 
     /**
      * @param array<string, mixed> $pairs
@@ -108,7 +90,7 @@ final class ContainerConfig
                     $this->definitions[$id] ??= $value;
                 }
                 else {
-                    $this->values[$id] ??= $value;
+                    $this->services[$id] ??= $value;
                 }
             }
         }
@@ -134,7 +116,7 @@ final class ContainerConfig
                     $this->definitions[$id] = $value;
                 }
                 else {
-                    $this->values[$id] = $value;
+                    $this->services[$id] = $value;
                 }
             }
         }
@@ -165,70 +147,5 @@ final class ContainerConfig
             mode: Mode::Default,
         );
         return ($this->definitionAttach)($this->groups[$groupName][$group]);
-    }
-
-    public function getRealId(string $id): string
-    {
-        return $this->aliases[$id] ?? $id;
-    }
-
-    public function getValue(string $id): mixed
-    {
-        return $this->values[$id] ?? null;
-    }
-
-    public function getDefinition(string $id): ?Definition
-    {
-        if (isset($this->definitions[$id])) {
-            return $this->definitions[$id];
-        }
-        if (isset($this->cache[$id])) {
-            return $this->cache[$id];
-        }
-        if (!class_exists($id)) {
-            return null;
-        }
-
-        /**
-         * @param string $groupName
-         * @param Closure $callback
-         */
-        foreach ($this->groupCallbacks as $groupName => $callback) {
-            if (isset($this->groups[$groupName]) && is_array($this->groups[$groupName])) {
-                foreach ($this->groups[$groupName] as $group => $definition) {
-                    if ($callback($id, $group)) {
-                        return $this->cache[$id] = $this->fromGroupDefinition($id, $definition);
-                    }
-                }
-            }
-        }
-
-        return $this->cache[$id] = new Definition(
-            id: $id,
-            auto: true,
-            shared: $this->shared,
-            mode: Mode::Default,
-        );
-    }
-
-    private function fromGroupDefinition(string $id, Definition $definition): ?Definition
-    {
-        $target = $definition->to;
-
-        if ($definition->to && is_string($definition->to)) {
-            if (!is_callable($definition->to)) {
-                return null;
-            }
-            $target = ($definition->to)(...);
-        }
-
-        return new Definition(
-            id: $id,
-            auto: $definition->auto,
-            shared: $definition->shared,
-            mode: $definition->mode,
-            to: $target,
-            args: $definition->args,
-        );
     }
 }

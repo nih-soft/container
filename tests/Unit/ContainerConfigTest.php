@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace NIH\Container\Tests\Unit;
 
+use Closure;
+use NIH\Container\Container;
 use NIH\Container\ContainerConfig;
 use NIH\Container\Definition;
 use NIH\Container\Mode;
@@ -16,12 +18,41 @@ use stdClass;
 
 final class ContainerConfigTest extends TestCase
 {
+    private Closure $getValue;
+    private Closure $getDefinition;
+    private Closure $getRealId;
+
+    private function definitionAccessor(ContainerConfig $config): Closure
+    {
+        $container = new Container($config);
+        
+        return (function (string $id): ?Definition {
+            return $this->getDefinition($id);
+        })->bindTo($container, $container);
+    }
+    
+    private function bindGetters(ContainerConfig $config): void
+    {
+        $container = new Container($config);
+
+        $this->getDefinition = (function (string $id): ?Definition {
+            return $this->getDefinition($id);
+        })->bindTo($container, $container);
+        $this->getValue = (function (string $id): mixed {
+            return $this->services[$id] ?? null;
+        })->bindTo($container, $container);
+        $this->getRealId = (function (string $id): string {
+            return $this->aliases[$id] ?? $id;
+        })->bindTo($container, $container);
+    }
+    
     public function testDefinitionBuilderOptions(): void
     {
         $config = new ContainerConfig();
+        $this->bindGetters($config);
 
         $builder = $config->auto(Some::class);
-        $definition = $config->getDefinition(Some::class);
+        $definition = ($this->getDefinition)(Some::class);
         self::assertNotNull($definition);
         self::assertSame(Some::class, $definition->id);
         self::assertSame(Mode::Default, $definition->mode);
@@ -31,25 +62,25 @@ final class ContainerConfigTest extends TestCase
         $builder = $config->manual(SomeInterface::class);
 
         $builder->ghost();
-        self::assertSame(Mode::Ghost, $config->getDefinition(SomeInterface::class)?->mode);
+        self::assertSame(Mode::Ghost, ($this->getDefinition)(SomeInterface::class)?->mode);
 
         $builder->nestedGhost();
-        self::assertSame(Mode::NestedGhost, $config->getDefinition(SomeInterface::class)?->mode);
+        self::assertSame(Mode::NestedGhost, ($this->getDefinition)(SomeInterface::class)?->mode);
 
         $builder->auto();
-        self::assertTrue($config->getDefinition(SomeInterface::class)?->auto);
+        self::assertTrue(($this->getDefinition)(SomeInterface::class)?->auto);
 
         $builder->manual();
-        self::assertFalse($config->getDefinition(SomeInterface::class)?->auto);
+        self::assertFalse(($this->getDefinition)(SomeInterface::class)?->auto);
 
         $builder->shared();
-        self::assertTrue($config->getDefinition(SomeInterface::class)?->shared);
+        self::assertTrue(($this->getDefinition)(SomeInterface::class)?->shared);
 
         $builder->shared(false);
-        self::assertFalse($config->getDefinition(SomeInterface::class)?->shared);
+        self::assertFalse(($this->getDefinition)(SomeInterface::class)?->shared);
 
         $builder->to(Some::class);
-        self::assertSame(Some::class, $config->getDefinition(SomeInterface::class)?->to);
+        self::assertSame(Some::class, ($this->getDefinition)(SomeInterface::class)?->to);
 
         $cb = static fn(): Some => new Some();
         $builder->callback($cb);
@@ -57,7 +88,7 @@ final class ContainerConfigTest extends TestCase
         $builder->argument('b', 2);
         $builder->mode(Mode::Proxy);
 
-        $definition = $config->getDefinition(SomeInterface::class);
+        $definition = ($this->getDefinition)(SomeInterface::class);
         self::assertNotNull($definition);
         self::assertSame(SomeInterface::class, $definition->id);
 
@@ -70,22 +101,25 @@ final class ContainerConfigTest extends TestCase
     public function testValueAndAliasResolution(): void
     {
         $config = new ContainerConfig();
+        $this->bindGetters($config);
+
         $config->value('answer', 42);
         $config->alias('answer_alias', 'answer');
 
         $config->manual(SomeInterface::class)->to(Some::class);
         $config->alias('service_alias', SomeInterface::class);
 
-        self::assertSame(42, $config->getValue($config->getRealId('answer_alias')));
+        self::assertSame(42, ($this->getValue)(($this->getRealId)('answer_alias')));
         self::assertSame(
             SomeInterface::class,
-            $config->getDefinition($config->getRealId('service_alias'))?->id
+            ($this->getDefinition)(($this->getRealId)('service_alias'))?->id
         );
     }
 
     public function testAddAndReplace(): void
     {
         $config = new ContainerConfig();
+        $this->bindGetters($config);
         $custom = new Definition(
             id: 'custom_id',
             auto: false,
@@ -102,26 +136,27 @@ final class ContainerConfigTest extends TestCase
             'def_obj' => $custom,
         ]);
 
-        self::assertSame(10, $config->getValue('value'));
-        self::assertSame(Some::class, $config->getDefinition('string_def')?->to);
-        self::assertIsCallable($config->getDefinition('closure_def')?->to);
-        self::assertSame('custom_id', $config->getDefinition('def_obj')?->id);
+        self::assertSame(10, ($this->getValue)('value'));
+        self::assertSame(Some::class, ($this->getDefinition)('string_def')?->to);
+        self::assertIsCallable(($this->getDefinition)('closure_def')?->to);
+        self::assertSame('custom_id', ($this->getDefinition)('def_obj')?->id);
 
         $config->replace([
             'string_def' => stdClass::class,
             'value' => 99,
         ]);
 
-        self::assertSame(99, $config->getValue('value'));
-        self::assertSame(stdClass::class, $config->getDefinition('string_def')?->to);
+        self::assertSame(99, ($this->getValue)('value'));
+        self::assertSame(stdClass::class, ($this->getDefinition)('string_def')?->to);
     }
 
     public function testDefinitionResolutionForKnownAndUnknownClasses(): void
     {
         $config = new ContainerConfig(shared: true);
+        $this->bindGetters($config);
 
-        $known = $config->getDefinition(stdClass::class);
-        $unknown = $config->getDefinition('Unknown\\MissingClass');
+        $known = ($this->getDefinition)(stdClass::class);
+        $unknown = ($this->getDefinition)('Unknown\\MissingClass');
 
         self::assertNotNull($known);
         self::assertSame(stdClass::class, $known->id);
@@ -134,13 +169,15 @@ final class ContainerConfigTest extends TestCase
     public function testInheritGroupDefinitionAppliesToImplementations(): void
     {
         $config = new ContainerConfig();
+        $this->bindGetters($config);
+
         $config->inherit(SomeInterface::class)
             ->manual()
             ->shared()
             ->mode(Mode::Proxy)
             ->argument('source', 'inherit');
 
-        $definition = $config->getDefinition(Some::class);
+        $definition = ($this->getDefinition)(Some::class);
         self::assertNotNull($definition);
         self::assertSame(Some::class, $definition->id);
         self::assertFalse($definition->auto);
@@ -152,12 +189,14 @@ final class ContainerConfigTest extends TestCase
     public function testNamespaceGroupDefinitionAppliesWithTrimmedPrefix(): void
     {
         $config = new ContainerConfig();
+        $this->bindGetters($config);
+
         $config->namespace('NIH\\Container\\Tests\\Fixtures\\')
             ->manual()
             ->mode(Mode::Ghost)
             ->argument('source', 'namespace');
 
-        $definition = $config->getDefinition(ModeSimple::class);
+        $definition = ($this->getDefinition)(ModeSimple::class);
         self::assertNotNull($definition);
         self::assertSame(ModeSimple::class, $definition->id);
         self::assertFalse($definition->auto);
@@ -168,12 +207,13 @@ final class ContainerConfigTest extends TestCase
     public function testRegexGroupDefinitionAppliesToMatchingClasses(): void
     {
         $config = new ContainerConfig();
+        $this->bindGetters($config);
         $config->regex('/^NIH\\\\Container\\\\Tests\\\\Fixtures\\\\ModeDepth.+$/')
             ->shared()
             ->mode(Mode::NestedGhost)
             ->argument('source', 'regex');
 
-        $definition = $config->getDefinition(ModeDepthOne::class);
+        $definition = ($this->getDefinition)(ModeDepthOne::class);
         self::assertNotNull($definition);
         self::assertSame(ModeDepthOne::class, $definition->id);
         self::assertFalse($definition->auto);

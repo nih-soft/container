@@ -7,26 +7,34 @@ namespace NIH\Container;
 use Psr\Container\ContainerInterface;
 use Throwable;
 
-final class Container implements ContainerInterface
+final class Container extends ContainerData implements ContainerInterface
 {
-    private array $instances = [];
-
+    private static array $groupCallbacks;
     private readonly Instantiator $instantiator;
 
     public function __construct(
-        private readonly ContainerConfig $config,
+        ContainerConfig $config,
     )
     {
         $config->value(__CLASS__, $this);
-
-        if (!$this->has(ContainerInterface::class)) {
-            $config->alias(ContainerInterface::class, __CLASS__);
-        }
+        $config->alias(ContainerInterface::class, __CLASS__);
 
         $config->value(
             Instantiator::class,
             $this->instantiator = new Instantiator($this, $config->cacheReflections, $config->mode, $config->maxDepth)
         );
+
+        $this->aliases = &$config->aliases;
+        $this->definitions = &$config->definitions;
+        $this->groups = &$config->groups;
+        $this->services = &$config->services;
+        $this->shared = $config->shared;
+
+        self::$groupCallbacks ??= [
+            'inherit' => static fn(string $id, string $group) => is_a($id, $group, true),
+            'namespace' => static fn(string $id, string $group) => str_starts_with($id, $group . '\\'),
+            'regex' => static fn(string $id, string $group) => preg_match($group, $id),
+        ];
     }
 
     /**
@@ -39,27 +47,22 @@ final class Container implements ContainerInterface
      */
     public function get(string $id): mixed
     {
-        //fast path from cache (values and shared entries). Only for benchmark
-        if (isset($this->instances[$id])) {
-            return $this->instances[$id];
-        }
+        return $this->services[$id]
+            ?? $this->services[$id = $this->aliases[$id] ?? $id]
+            ?? $this->getInternal($id);
+    }
 
-        $config = $this->config;
-        $id = $config->getRealId($id);
-
-        //fast path from cache (aliased values and shared entries)
-        if (isset($this->instances[$id])) {
-            return $this->instances[$id];
-        }
-
-        $value = $config->getValue($id);
-
-        if ($value !== null) {
-            //set cache and return value
-            return $this->instances[$id] = $value;
-        }
-
-        $definition = $config->getDefinition($id);
+    /**
+     * Finds an entry of the container by its identifier and returns it.
+     *
+     * @param string $id Identifier of the entry to look for.
+     * @return mixed Entry.
+     * @throws ContainerNotFoundException  No entry was found for **this** identifier.
+     * @throws ContainerException Error while retrieving the entry.
+     */
+    private function getInternal(string $id): mixed
+    {
+        $definition = $this->getDefinition($id);
 
         if ($definition === null) {
             throw new ContainerNotFoundException(sprintf('No definition or class found or resolvable for "%s".', $id));
@@ -68,7 +71,7 @@ final class Container implements ContainerInterface
         $instance = $this->newFromDefinition($definition);
         if ($definition->shared) {
             //set cache
-            $this->instances[$id] = $instance;
+            $this->services[$id] = $instance;
         }
         return $instance;
     }
@@ -83,16 +86,15 @@ final class Container implements ContainerInterface
      */
     public function new(string $id): mixed
     {
-        $config = $this->config;
-        $id = $config->getRealId($id);
-
-        $value = $config->getValue($id);
-        if ($value !== null && !is_object($value)) {
-            //can return only simple types
-            return $value;
+        if (isset($this->aliases[$id])) {
+            $id = $this->aliases[$id];
+        }
+        //can return only simple types
+        if (isset($this->services[$id]) && !isset($this->definitions[$id]) && !is_object($this->services[$id])) {
+            return $this->services[$id];
         }
 
-        $definition = $config->getDefinition($id);
+        $definition = $this->getDefinition($id);
 
         if ($definition === null) {
             throw new ContainerNotFoundException(sprintf('No definition or class found or resolvable for "%s".', $id));
@@ -147,10 +149,7 @@ final class Container implements ContainerInterface
      */
     public function has(string $id): bool
     {
-        $config = $this->config;
-        $id = $config->getRealId($id);
-
-        return isset($this->instances[$id]) || $config->getValue($id) !== null || $config->getDefinition($id);
+        return isset($this->services[$id]) || isset($this->services[$id = $this->aliases[$id] ?? $id]) || $this->getDefinition($id);
     }
 
     /**
@@ -162,11 +161,61 @@ final class Container implements ContainerInterface
      */
     public function hasInstance(string $id): bool
     {
-        $config = $this->config;
-        $id = $config->getRealId($id);
-        $definition = $config->getDefinition($id);
+        $definition = $this->getDefinition($id = $this->aliases[$id] ?? $id);
 
-        return ($definition !== null) && isset($this->instances[$definition->id]) && $definition->shared;
+        return ($definition !== null) && isset($this->services[$definition->id]) && $definition->shared;
+    }
+
+    private function getDefinition(string $id): ?Definition
+    {
+        if (isset($this->definitions[$id])) {
+            return $this->definitions[$id];
+        }
+        if (!class_exists($id)) {
+            return null;
+        }
+
+        /**
+         * @param string $groupName
+         * @param Closure $callback
+         */
+        foreach (self::$groupCallbacks as $groupName => $callback) {
+            if (isset($this->groups[$groupName]) && is_array($this->groups[$groupName])) {
+                foreach ($this->groups[$groupName] as $group => $definition) {
+                    if ($callback($id, $group)) {
+                        return $this->definitions[$id] = $this->fromGroupDefinition($id, $definition);
+                    }
+                }
+            }
+        }
+
+        return $this->definitions[$id] = new Definition(
+            id: $id,
+            auto: true,
+            shared: $this->shared,
+            mode: Mode::Default,
+        );
+    }
+
+    private function fromGroupDefinition(string $id, Definition $definition): ?Definition
+    {
+        $target = $definition->to;
+
+        if ($definition->to && is_string($definition->to)) {
+            if (!is_callable($definition->to)) {
+                return null;
+            }
+            $target = ($definition->to)(...);
+        }
+
+        return new Definition(
+            id: $id,
+            auto: $definition->auto,
+            shared: $definition->shared,
+            mode: $definition->mode,
+            to: $target,
+            args: $definition->args,
+        );
     }
 
 }

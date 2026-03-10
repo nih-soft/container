@@ -22,15 +22,6 @@ final class ContainerConfigTest extends TestCase
     private Closure $getDefinition;
     private Closure $getRealId;
 
-    private function definitionAccessor(ContainerConfig $config): Closure
-    {
-        $container = new Container($config);
-        
-        return (function (string $id): ?Definition {
-            return $this->getDefinition($id);
-        })->bindTo($container, $container);
-    }
-    
     private function bindGetters(ContainerConfig $config): void
     {
         $container = new Container($config);
@@ -51,7 +42,7 @@ final class ContainerConfigTest extends TestCase
         $config = new ContainerConfig();
         $this->bindGetters($config);
 
-        $builder = $config->auto(Some::class);
+        $config->auto(Some::class);
         $definition = ($this->getDefinition)(Some::class);
         self::assertNotNull($definition);
         self::assertSame(Some::class, $definition->id);

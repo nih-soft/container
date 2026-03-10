@@ -161,7 +161,7 @@ final class Container extends ContainerData implements ContainerInterface
      */
     public function hasInstance(string $id): bool
     {
-        $definition = $this->getDefinition($id = $this->aliases[$id] ?? $id);
+        $definition = $this->getDefinition($this->aliases[$id] ?? $id);
 
         return ($definition !== null) && isset($this->services[$definition->id]) && $definition->shared;
     }

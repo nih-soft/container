@@ -85,8 +85,9 @@ class Instantiator
      * @throws ReflectionException
      *
      * @throws MissingRequiredArgumentException if required argument is missing.
+     * @noinspection PhpDocRedundantThrowsInspection
      */
-    public function invoke(callable $callable, array $arguments = [], Mode $mode = Mode::Default, bool $auto = true, bool $dynamicArguments = true)
+    public function invoke(callable $callable, array $arguments = [], Mode $mode = Mode::Default, bool $auto = true, bool $dynamicArguments = true): mixed
     {
         $callable = $callable(...);
         if ($mode === Mode::Default) {

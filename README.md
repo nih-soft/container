@@ -1,6 +1,6 @@
 # NIH Container
 
-A lightweight PSR-11 dependency injection container for PHP `8.5+` with autowiring, lazy objects, and circular-reference support.
+A lightweight PSR-11 dependency injection container for PHP `8.4+` with autowiring, lazy objects, and circular-reference support.
 
 ## Contents
 
